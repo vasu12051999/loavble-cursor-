@@ -11,6 +11,7 @@ import { MapPin, DollarSign, Calendar, MessageSquare, Award, Languages, Flag } f
 import { toast } from '@/hooks/use-toast';
 import BidCard from '@/components/jobs/BidCard';
 import { JobStatusActions } from '@/components/jobs/JobStatusActions';
+import { JobReviewPrompt } from '@/components/jobs/JobReviewPrompt';
 import { useRealtimeBids } from '@/hooks/useRealtimeBids';
 import { ReportDialog } from '@/components/jobs/ReportDialog';
 import { analytics } from '@/utils/analytics';
@@ -139,6 +140,11 @@ export default function JobDetail() {
     <div className="container py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {/* Review Prompt for Completed Jobs */}
+          {job.status === 'completed' && (
+            <JobReviewPrompt jobId={id!} jobTitle={job.title} />
+          )}
+          
           <Card>
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -174,6 +180,30 @@ export default function JobDetail() {
                 <h3 className="text-lg font-semibold">Description</h3>
                 <p className="text-muted-foreground">{job.description}</p>
               </div>
+
+              {/* Job Photos */}
+              {job.media_urls && job.media_urls.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Photos</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {job.media_urls.map((url: string, index: number) => (
+                      <a
+                        key={index}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block aspect-square overflow-hidden rounded-lg border hover:opacity-80 transition-opacity"
+                      >
+                        <img
+                          src={url}
+                          alt={`Job photo ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {job.description_spanish && (
                 <Button variant="outline" size="sm">

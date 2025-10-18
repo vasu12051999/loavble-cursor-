@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,8 +12,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Upload, ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { Upload, ArrowLeft, ArrowRight, Check, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useFileUpload } from '@/hooks/useFileUpload';
 
 const formSchema = z.object({
   title: z.string().min(20, 'Title must be at least 20 characters'),
@@ -30,8 +31,20 @@ export default function NewJob() {
   const [step, setStep] = useState(1);
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  const { uploadFile, uploading, deleteFile } = useFileUpload({
+    bucket: 'job-photos',
+    maxSizeMB: 10,
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
+    onSuccess: (url) => {
+      setUploadedPhotos(prev => [...prev, url]);
+      form.setValue('media_urls', [...uploadedPhotos, url]);
+    },
+  });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -81,7 +94,7 @@ export default function NewJob() {
         category_id: data.category_id,
         budget: parseFloat(data.budget),
         location: data.location,
-        media_urls: data.media_urls || [],
+        media_urls: uploadedPhotos,
       });
 
       if (error) {
@@ -216,12 +229,79 @@ export default function NewJob() {
 
               {step === 3 && (
                 <div className="space-y-4">
-                  <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                    <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                    <p className="text-sm text-muted-foreground">
-                      Drag and drop photos here, or click to select
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">Up to 5 photos</p>
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Add Photos (Optional)</h3>
+                    <p className="text-sm text-muted-foreground">Upload up to 5 photos to help providers understand your needs better</p>
+                    
+                    {/* Photo Grid */}
+                    {uploadedPhotos.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {uploadedPhotos.map((url, index) => (
+                          <div key={index} className="relative group aspect-square">
+                            <img 
+                              src={url} 
+                              alt={`Job photo ${index + 1}`}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                            <Button
+                              size="icon"
+                              variant="destructive"
+                              className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={async () => {
+                                await deleteFile(url);
+                                const newPhotos = uploadedPhotos.filter((_, i) => i !== index);
+                                setUploadedPhotos(newPhotos);
+                                form.setValue('media_urls', newPhotos);
+                              }}
+                              type="button"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Upload Area */}
+                    {uploadedPhotos.length < 5 && (
+                      <div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file && user) {
+                              await uploadFile(file, user.id);
+                              e.target.value = ''; // Reset input
+                            }
+                          }}
+                          disabled={uploading}
+                        />
+                        <div 
+                          className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
+                          onClick={() => !uploading && fileInputRef.current?.click()}
+                        >
+                          {uploading ? (
+                            <>
+                              <Loader2 className="mx-auto h-12 w-12 text-primary mb-4 animate-spin" />
+                              <p className="text-sm text-muted-foreground">Uploading photo...</p>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                              <p className="text-sm text-muted-foreground">
+                                Click to select photos or drag and drop
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {uploadedPhotos.length} of 5 photos uploaded
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

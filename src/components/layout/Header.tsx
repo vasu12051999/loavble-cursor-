@@ -82,9 +82,11 @@ export const Header = () => {
                   <DropdownMenuItem asChild>
                     <Link to="/dashboard" className="cursor-pointer">{t('nav.dashboard')}</Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to={`/profile/${user.id}`} className="cursor-pointer">{t('nav.profile')}</Link>
-                  </DropdownMenuItem>
+                  {user?.id && (
+                    <DropdownMenuItem asChild>
+                      <Link to={`/profile/${user.id}`} className="cursor-pointer">{t('nav.profile')}</Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link to="/profile/edit" className="cursor-pointer">Edit Profile</Link>
                   </DropdownMenuItem>
@@ -178,9 +180,11 @@ export const Header = () => {
                   <Button variant="ghost" asChild onClick={() => setMobileMenuOpen(false)}>
                     <Link to="/dashboard">{t('nav.dashboard')}</Link>
                   </Button>
-                  <Button variant="ghost" asChild onClick={() => setMobileMenuOpen(false)}>
-                    <Link to={`/profile/${user.id}`}>{t('nav.profile')}</Link>
-                  </Button>
+                  {user?.id && (
+                    <Button variant="ghost" asChild onClick={() => setMobileMenuOpen(false)}>
+                      <Link to={`/profile/${user.id}`}>{t('nav.profile')}</Link>
+                    </Button>
+                  )}
                   <Button variant="ghost" asChild onClick={() => setMobileMenuOpen(false)}>
                     <Link to="/profile/edit">Edit Profile</Link>
                   </Button>
