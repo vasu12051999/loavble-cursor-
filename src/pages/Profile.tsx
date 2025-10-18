@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,16 +32,7 @@ export default function Profile() {
   // Use uid from URL or current user's id if viewing own profile
   const profileId = uid || user?.id;
 
-  useEffect(() => {
-    if (profileId) {
-      fetchProfile();
-      fetchProviderData();
-      fetchCompletedJobs();
-      fetchReviews();
-    }
-  }, [profileId, user?.id]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!profileId) {
       setLoading(false);
       return;
@@ -83,9 +74,9 @@ export default function Profile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profileId, user?.id]);
 
-  const fetchProviderData = async () => {
+  const fetchProviderData = useCallback(async () => {
     if (!profileId) return;
 
     try {
@@ -111,9 +102,9 @@ export default function Profile() {
     } catch (error) {
       console.error('Error fetching provider data:', error);
     }
-  };
+  }, [profileId]);
 
-  const fetchCompletedJobs = async () => {
+  const fetchCompletedJobs = useCallback(async () => {
     if (!profileId) return;
     
     try {
@@ -128,9 +119,9 @@ export default function Profile() {
     } catch (error) {
       console.error('Error fetching completed jobs:', error);
     }
-  };
+  }, [profileId]);
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     if (!profileId) return;
     
     try {
@@ -148,7 +139,17 @@ export default function Profile() {
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  };
+  }, [profileId]);
+
+  useEffect(() => {
+    if (profileId) {
+      setLoading(true);
+      fetchProfile();
+      fetchProviderData();
+      fetchCompletedJobs();
+      fetchReviews();
+    }
+  }, [profileId, fetchProfile, fetchProviderData, fetchCompletedJobs, fetchReviews]);
 
   if (loading) {
     return (
