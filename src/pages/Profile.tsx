@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Star, MapPin, Briefcase, MessageSquare, Calendar, Award, CheckCircle, DollarSign, Clock } from 'lucide-react';
+import { Star, MapPin, Briefcase, MessageSquare, Calendar, Award, CheckCircle, DollarSign, Clock, Edit } from 'lucide-react';
 import { QuickQuoteDialog } from '@/components/providers/QuickQuoteDialog';
 import { PortfolioGallery } from '@/components/portfolio/PortfolioGallery';
 import { ReviewsList } from '@/components/reviews/ReviewsList';
@@ -29,27 +29,32 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [reviewStats, setReviewStats] = useState({ averageRating: 0, totalReviews: 0 });
 
+  // Use uid from URL or current user's id if viewing own profile
+  const profileId = uid || user?.id;
+
   useEffect(() => {
-    fetchProfile();
-    fetchProviderData();
-    fetchCompletedJobs();
-    fetchReviews();
-  }, [uid]);
+    if (profileId) {
+      fetchProfile();
+      fetchProviderData();
+      fetchCompletedJobs();
+      fetchReviews();
+    }
+  }, [profileId, user?.id]);
 
   const fetchProfile = async () => {
-    if (!uid) {
+    if (!profileId) {
       setLoading(false);
       return;
     }
 
     try {
-      const isOwnProfile = uid === user?.id;
+      const isOwnProfile = profileId === user?.id;
       
       // Fetch profile data
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', uid)
+        .eq('id', profileId)
         .maybeSingle();
 
       if (profileError) {
@@ -61,7 +66,7 @@ export default function Profile() {
         const { data: rolesData, error: rolesError } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', uid);
+          .eq('user_id', profileId);
 
         if (rolesError) {
           console.error('Error fetching roles:', rolesError);
@@ -81,24 +86,24 @@ export default function Profile() {
   };
 
   const fetchProviderData = async () => {
-    if (!uid) return;
+    if (!profileId) return;
 
     try {
       const { data: settings } = await supabase
         .from('provider_settings')
         .select('*')
-        .eq('provider_id', uid)
+        .eq('provider_id', profileId)
         .maybeSingle();
 
       const { data: skillsData } = await supabase
         .from('provider_skills')
         .select('*')
-        .eq('provider_id', uid);
+        .eq('provider_id', profileId);
 
       const { data: certsData } = await supabase
         .from('provider_certifications')
         .select('*')
-        .eq('provider_id', uid);
+        .eq('provider_id', profileId);
 
       setProviderSettings(settings);
       setSkills(skillsData || []);
@@ -109,13 +114,13 @@ export default function Profile() {
   };
 
   const fetchCompletedJobs = async () => {
-    if (!uid) return;
+    if (!profileId) return;
     
     try {
       const { data } = await supabase
         .from('jobs')
         .select('*, categories(name)')
-        .eq('awarded_provider_id', uid)
+        .eq('awarded_provider_id', profileId)
         .eq('status', 'completed')
         .limit(6);
 
@@ -126,14 +131,14 @@ export default function Profile() {
   };
 
   const fetchReviews = async () => {
-    if (!uid) return;
+    if (!profileId) return;
     
     try {
       // Fetch reviews with average rating
       const { data } = await supabase
         .from('reviews')
         .select('rating')
-        .eq('reviewed_id', uid);
+        .eq('reviewed_id', profileId);
 
       if (data && data.length > 0) {
         const avgRating = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
@@ -249,7 +254,14 @@ export default function Profile() {
               )}
 
               <div className="flex gap-3">
-                {user?.id !== uid && isProvider && (
+                {user?.id === profileId ? (
+                  <Button asChild>
+                    <Link to="/profile/edit">
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Profile
+                    </Link>
+                  </Button>
+                ) : isProvider && (
                   <>
                     <Button onClick={() => {
                       if (!user) {
@@ -265,7 +277,7 @@ export default function Profile() {
                       <MessageSquare className="mr-2 h-4 w-4" />
                       {t('profile.message')}
                     </Button>
-                    <QuickQuoteDialog providerId={uid!} providerName={profile.full_name || 'Provider'} />
+                    <QuickQuoteDialog providerId={profileId!} providerName={profile.full_name || 'Provider'} />
                   </>
                 )}
               </div>
@@ -314,14 +326,14 @@ export default function Profile() {
             
             {/* Portfolio Gallery */}
             <PortfolioGallery 
-              providerId={uid!} 
-              isOwnProfile={user?.id === uid}
+              providerId={profileId!} 
+              isOwnProfile={user?.id === profileId}
             />
           </TabsContent>
 
           <TabsContent value="reviews" className="space-y-4">
             <h2 className="text-2xl font-bold">{t('profile.reviewsRatings')}</h2>
-            <ReviewsList userId={uid!} limit={10} />
+            <ReviewsList userId={profileId!} limit={10} />
           </TabsContent>
 
           {isProvider && (
