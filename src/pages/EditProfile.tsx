@@ -63,21 +63,40 @@ export default function EditProfile() {
   const fetchProfile = async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-    if (data) {
-      setProfile(data);
-      setAvatarUrl(data.avatar_url);
-      form.reset({
-        full_name: data.full_name || '',
-        bio: data.bio || '',
-        location: data.location || '',
-        phone: data.phone || '',
-        language_preference: (data.language_preference === 'es' ? 'es' : 'en') as 'en' | 'es',
+      if (error) {
+        console.error('Error fetching profile:', error);
+        toast({ 
+          title: 'Error loading profile', 
+          description: error.message, 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      if (data) {
+        setProfile(data);
+        setAvatarUrl(data.avatar_url);
+        form.reset({
+          full_name: data.full_name || '',
+          bio: data.bio || '',
+          location: data.location || '',
+          phone: data.phone || '',
+          language_preference: (data.language_preference === 'es' ? 'es' : 'en') as 'en' | 'es',
+        });
+      }
+    } catch (error: any) {
+      console.error('Unexpected error:', error);
+      toast({ 
+        title: 'Error loading profile', 
+        description: error.message, 
+        variant: 'destructive' 
       });
     }
   };
