@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -113,6 +114,11 @@ export default function Dashboard() {
       
       <main className="flex-1 py-8 px-4">
         <div className="container mx-auto max-w-6xl">
+          {/* Email Verification Banner */}
+          <div className="mb-6">
+            <EmailVerificationBanner />
+          </div>
+
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">

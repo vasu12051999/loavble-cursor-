@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { MapPin, DollarSign, Calendar, MessageSquare, Award, Languages, Flag } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import BidCard from '@/components/jobs/BidCard';
+import { JobStatusActions } from '@/components/jobs/JobStatusActions';
 import { useRealtimeBids } from '@/hooks/useRealtimeBids';
 import { ReportDialog } from '@/components/jobs/ReportDialog';
 import { analytics } from '@/utils/analytics';
@@ -257,6 +258,21 @@ export default function JobDetail() {
         </div>
 
         <aside className="space-y-6">
+          {/* Job Status Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Job Actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <JobStatusActions
+                job={job}
+                isOwner={isOwner}
+                isProvider={userRole === 'provider'}
+                onStatusChange={fetchJobDetails}
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Posted By</CardTitle>
