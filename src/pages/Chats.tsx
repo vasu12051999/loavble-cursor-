@@ -99,7 +99,14 @@ export default function Chats() {
 
     const { data } = await supabase
       .from('messages')
-      .select('job_id, jobs(title), sender_id, recipient_id, profiles!messages_sender_id_fkey(full_name), profiles!messages_recipient_id_fkey(full_name)')
+      .select(`
+        job_id, 
+        jobs(title), 
+        sender_id, 
+        recipient_id,
+        sender:profiles!messages_sender_id_fkey(full_name),
+        recipient:profiles!messages_recipient_id_fkey(full_name)
+      `)
       .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
@@ -348,16 +355,16 @@ export default function Chats() {
                       <Avatar>
                         <AvatarFallback>
                           {thread.sender_id === user?.id
-                            ? thread.profiles?.full_name?.[0] || 'U'
-                            : thread.profiles?.full_name?.[0] || 'U'}
+                            ? thread.recipient?.full_name?.[0] || 'U'
+                            : thread.sender?.full_name?.[0] || 'U'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{thread.jobs?.title}</p>
                         <p className="text-sm text-muted-foreground truncate">
                           {thread.sender_id === user?.id
-                            ? thread.profiles?.full_name
-                            : thread.profiles?.full_name}
+                            ? thread.recipient?.full_name
+                            : thread.sender?.full_name}
                         </p>
                       </div>
                     </div>
@@ -385,8 +392,8 @@ export default function Chats() {
                       </h3>
                       <p className="text-sm text-muted-foreground">
                         {threads.find(t => t.job_id === selectedThread)?.sender_id === user?.id
-                          ? threads.find(t => t.job_id === selectedThread)?.profiles?.full_name
-                          : threads.find(t => t.job_id === selectedThread)?.profiles?.full_name}
+                          ? threads.find(t => t.job_id === selectedThread)?.recipient?.full_name
+                          : threads.find(t => t.job_id === selectedThread)?.sender?.full_name}
                       </p>
                     </div>
                   </div>
