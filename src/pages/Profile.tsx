@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,124 +32,96 @@ export default function Profile() {
   // Use uid from URL or current user's id if viewing own profile
   const profileId = uid || user?.id;
 
-  const fetchProfile = useCallback(async () => {
+  useEffect(() => {
     if (!profileId) {
       setLoading(false);
       return;
     }
 
-    try {
-      const isOwnProfile = profileId === user?.id;
+    const fetchAllData = async () => {
+      setLoading(true);
       
-      // Fetch profile data
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', profileId)
-        .maybeSingle();
+      try {
+        // Fetch profile data
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', profileId)
+          .maybeSingle();
 
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-      }
-
-      if (profileData) {
-        // Fetch user roles separately
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', profileId);
-
-        if (rolesError) {
-          console.error('Error fetching roles:', rolesError);
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
         }
 
-        // Combine the data
-        setProfile({
-          ...profileData,
-          user_roles: rolesData || []
-        });
+        if (profileData) {
+          // Fetch user roles separately
+          const { data: rolesData, error: rolesError } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', profileId);
+
+          if (rolesError) {
+            console.error('Error fetching roles:', rolesError);
+          }
+
+          // Combine the data
+          setProfile({
+            ...profileData,
+            user_roles: rolesData || []
+          });
+        }
+
+        // Fetch provider data
+        const { data: settings } = await supabase
+          .from('provider_settings')
+          .select('*')
+          .eq('provider_id', profileId)
+          .maybeSingle();
+
+        const { data: skillsData } = await supabase
+          .from('provider_skills')
+          .select('*')
+          .eq('provider_id', profileId);
+
+        const { data: certsData } = await supabase
+          .from('provider_certifications')
+          .select('*')
+          .eq('provider_id', profileId);
+
+        setProviderSettings(settings);
+        setSkills(skillsData || []);
+        setCertifications(certsData || []);
+
+        // Fetch completed jobs
+        const { data: jobsData } = await supabase
+          .from('jobs')
+          .select('*, categories(name)')
+          .eq('awarded_provider_id', profileId)
+          .eq('status', 'completed')
+          .limit(6);
+
+        setCompletedJobs(jobsData || []);
+
+        // Fetch reviews with average rating
+        const { data: reviewsData } = await supabase
+          .from('reviews')
+          .select('rating')
+          .eq('reviewed_id', profileId);
+
+        if (reviewsData && reviewsData.length > 0) {
+          const avgRating = reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length;
+          setReviews(reviewsData);
+          setReviewStats({ averageRating: avgRating, totalReviews: reviewsData.length });
+        }
+      } catch (error) {
+        console.error('Unexpected error fetching profile data:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Unexpected error in fetchProfile:', error);
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    fetchAllData();
   }, [profileId, user?.id]);
-
-  const fetchProviderData = useCallback(async () => {
-    if (!profileId) return;
-
-    try {
-      const { data: settings } = await supabase
-        .from('provider_settings')
-        .select('*')
-        .eq('provider_id', profileId)
-        .maybeSingle();
-
-      const { data: skillsData } = await supabase
-        .from('provider_skills')
-        .select('*')
-        .eq('provider_id', profileId);
-
-      const { data: certsData } = await supabase
-        .from('provider_certifications')
-        .select('*')
-        .eq('provider_id', profileId);
-
-      setProviderSettings(settings);
-      setSkills(skillsData || []);
-      setCertifications(certsData || []);
-    } catch (error) {
-      console.error('Error fetching provider data:', error);
-    }
-  }, [profileId]);
-
-  const fetchCompletedJobs = useCallback(async () => {
-    if (!profileId) return;
-    
-    try {
-      const { data } = await supabase
-        .from('jobs')
-        .select('*, categories(name)')
-        .eq('awarded_provider_id', profileId)
-        .eq('status', 'completed')
-        .limit(6);
-
-      setCompletedJobs(data || []);
-    } catch (error) {
-      console.error('Error fetching completed jobs:', error);
-    }
-  }, [profileId]);
-
-  const fetchReviews = useCallback(async () => {
-    if (!profileId) return;
-    
-    try {
-      // Fetch reviews with average rating
-      const { data } = await supabase
-        .from('reviews')
-        .select('rating')
-        .eq('reviewed_id', profileId);
-
-      if (data && data.length > 0) {
-        const avgRating = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
-        setReviews(data);
-        setReviewStats({ averageRating: avgRating, totalReviews: data.length });
-      }
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-    }
-  }, [profileId]);
-
-  useEffect(() => {
-    if (profileId) {
-      setLoading(true);
-      fetchProfile();
-      fetchProviderData();
-      fetchCompletedJobs();
-      fetchReviews();
-    }
-  }, [profileId, fetchProfile, fetchProviderData, fetchCompletedJobs, fetchReviews]);
 
   if (loading) {
     return (
