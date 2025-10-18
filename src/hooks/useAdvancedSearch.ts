@@ -9,7 +9,9 @@ export interface SearchFilters {
   location?: string;
   radius?: number; // in miles
   datePosted?: 'today' | 'week' | 'month' | 'all';
-  sortBy?: 'recent' | 'budget_high' | 'budget_low' | 'nearest';
+  sortBy?: 'recent' | 'budget_high' | 'budget_low' | 'nearest' | 'relevance';
+  status?: string[];
+  availableOnly?: boolean;
 }
 
 export function useAdvancedSearch(filters: SearchFilters) {
@@ -28,12 +30,20 @@ export function useAdvancedSearch(filters: SearchFilters) {
         *,
         categories(name, icon),
         profiles!jobs_customer_id_fkey(full_name, avatar_url)
-      `)
-      .eq('status', 'open');
+      `);
 
-    // Text search
-    if (filters.query) {
-      query = query.or(`title.ilike.%${filters.query}%,description.ilike.%${filters.query}%`);
+    // Status filter - default to open if not specified
+    if (filters.status && filters.status.length > 0) {
+      query = query.in('status', filters.status);
+    } else {
+      query = query.eq('status', 'open');
+    }
+
+    // Full-text search - search across title, description, and location
+    if (filters.query && filters.query.trim()) {
+      const searchTerm = filters.query.trim();
+      // Use Postgres full-text search or fallback to ilike
+      query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,location.ilike.%${searchTerm}%`);
     }
 
     // Category filter

@@ -3,8 +3,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Link } from 'react-router-dom';
@@ -27,11 +29,20 @@ export default function Dashboard() {
     platformFees: 0,
     reports: 0
   });
+  const [recentJobs, setRecentJobs] = useState<any[]>([]);
+  const [recommendedJobs, setRecommendedJobs] = useState<any[]>([]);
+  const [myBids, setMyBids] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchProfile();
       fetchStats();
+      if (userRole === 'customer') {
+        fetchRecentJobs();
+      } else if (userRole === 'provider') {
+        fetchRecommendedJobs();
+        fetchMyBids();
+      }
     }
   }, [user, userRole]);
 
@@ -44,6 +55,71 @@ export default function Dashboard() {
 
     if (!error) {
       setProfile(data);
+    }
+  };
+
+  const fetchRecentJobs = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*, categories(name), bids(count)')
+      .eq('customer_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (!error && data) {
+      setRecentJobs(data);
+    }
+  };
+
+  const fetchRecommendedJobs = async () => {
+    if (!user) return;
+
+    // Get provider's skills
+    const { data: skillsData } = await supabase
+      .from('provider_skills')
+      .select('skill_name')
+      .eq('provider_id', user.id);
+
+    const skills = skillsData?.map(s => s.skill_name.toLowerCase()) || [];
+
+    // Fetch open jobs matching skills or all if no skills
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*, categories(name), profiles!jobs_customer_id_fkey(full_name)')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (!error && data) {
+      // Filter by skills if available, otherwise show all
+      let filtered = data;
+      if (skills.length > 0) {
+        filtered = data.filter(job => 
+          skills.some(skill => 
+            job.title?.toLowerCase().includes(skill) ||
+            job.description?.toLowerCase().includes(skill) ||
+            job.categories?.name?.toLowerCase().includes(skill)
+          )
+        );
+      }
+      setRecommendedJobs(filtered.slice(0, 5));
+    }
+  };
+
+  const fetchMyBids = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('bids')
+      .select('*, jobs(*, categories(name))')
+      .eq('provider_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (!error && data) {
+      setMyBids(data);
     }
   };
 
@@ -113,6 +189,11 @@ export default function Dashboard() {
       
       <main className="flex-1 py-8 px-4">
         <div className="container mx-auto max-w-6xl">
+          {/* Email Verification Banner */}
+          <div className="mb-6">
+            <EmailVerificationBanner />
+          </div>
+
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">
@@ -266,17 +347,68 @@ export default function Dashboard() {
               {/* Recent Jobs */}
               <Card>
                 <CardHeader>
-                  <CardTitle>{t('dashboard.yourJobs.title')}</CardTitle>
-                  <CardDescription>{t('dashboard.yourJobs.description')}</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>{t('dashboard.yourJobs.title')}</CardTitle>
+                      <CardDescription>{t('dashboard.yourJobs.description')}</CardDescription>
+                    </div>
+                    {recentJobs.length > 0 && (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to="/jobs">View All</Link>
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="mb-4">{t('dashboard.yourJobs.empty')}</p>
-                    <Button asChild>
-                      <Link to="/jobs/new">{t('dashboard.yourJobs.firstJob')}</Link>
-                    </Button>
-                  </div>
+                  {recentJobs.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="mb-4">{t('dashboard.yourJobs.empty')}</p>
+                      <Button asChild>
+                        <Link to="/jobs/new">{t('dashboard.yourJobs.firstJob')}</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {recentJobs.map((job) => (
+                        <Link 
+                          key={job.id} 
+                          to={`/jobs/${job.id}`}
+                          className="block p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-semibold truncate">{job.title}</h3>
+                                <Badge variant={job.status === 'open' ? 'default' : 'secondary'}>
+                                  {job.status}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                                {job.description}
+                              </p>
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="h-3 w-3" />
+                                  ${job.budget}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(job.created_at).toLocaleDateString()}
+                                </span>
+                                {job.bids && job.bids.length > 0 && (
+                                  <span className="flex items-center gap-1">
+                                    <MessageCircle className="h-3 w-3" />
+                                    {job.bids.length} bids
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -328,22 +460,72 @@ export default function Dashboard() {
                 <TabsContent value="recommended" className="mt-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>{t('dashboard.recommended.title')}</CardTitle>
-                      <CardDescription>{t('dashboard.recommended.description')}</CardDescription>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle>{t('dashboard.recommended.title')}</CardTitle>
+                          <CardDescription>{t('dashboard.recommended.description')}</CardDescription>
+                        </div>
+                        {recommendedJobs.length > 0 && (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link to="/jobs">View All Jobs</Link>
+                          </Button>
+                        )}
+                      </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-center py-12 text-muted-foreground">
-                        <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="mb-4">{t('dashboard.recommended.empty')}</p>
-                        <Button asChild variant="outline">
-                          <Link to="/profile/edit">{t('dashboard.recommended.complete')}</Link>
-                        </Button>
-                      </div>
-                      <div className="mt-4 text-center">
-                        <Button asChild>
-                          <Link to="/jobs">{t('dashboard.recommended.browse')}</Link>
-                        </Button>
-                      </div>
+                      {recommendedJobs.length === 0 ? (
+                        <div>
+                          <div className="text-center py-12 text-muted-foreground">
+                            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p className="mb-4">{t('dashboard.recommended.empty')}</p>
+                            <Button asChild variant="outline">
+                              <Link to="/profile/edit">{t('dashboard.recommended.complete')}</Link>
+                            </Button>
+                          </div>
+                          <div className="mt-4 text-center">
+                            <Button asChild>
+                              <Link to="/jobs">{t('dashboard.recommended.browse')}</Link>
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {recommendedJobs.map((job) => (
+                            <Link 
+                              key={job.id} 
+                              to={`/jobs/${job.id}`}
+                              className="block p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-semibold truncate">{job.title}</h3>
+                                    <Badge>{job.categories?.name}</Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                                    {job.description}
+                                  </p>
+                                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <DollarSign className="h-3 w-3" />
+                                      ${job.budget}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="h-3 w-3" />
+                                      {job.location}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <User className="h-3 w-3" />
+                                      {job.profiles?.full_name || 'Anonymous'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <Button size="sm">View Details</Button>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -355,13 +537,57 @@ export default function Dashboard() {
                       <CardDescription>{t('dashboard.yourBids.description')}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-center py-12 text-muted-foreground">
-                        <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="mb-4">{t('dashboard.yourBids.empty')}</p>
-                        <Button asChild>
-                          <Link to="/jobs">{t('dashboard.yourBids.browse')}</Link>
-                        </Button>
-                      </div>
+                      {myBids.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p className="mb-4">{t('dashboard.yourBids.empty')}</p>
+                          <Button asChild>
+                            <Link to="/jobs">{t('dashboard.yourBids.browse')}</Link>
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {myBids.map((bid) => (
+                            <Link 
+                              key={bid.id} 
+                              to={`/jobs/${bid.job_id}`}
+                              className="block p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-semibold truncate">{bid.jobs?.title}</h3>
+                                    <Badge variant={
+                                      bid.status === 'awarded' ? 'default' : 
+                                      bid.status === 'rejected' ? 'destructive' : 
+                                      'secondary'
+                                    }>
+                                      {bid.status}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mb-2">
+                                    Your bid: ${bid.amount}
+                                  </p>
+                                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      {new Date(bid.created_at).toLocaleDateString()}
+                                    </span>
+                                    {bid.jobs?.categories && (
+                                      <span>{bid.jobs.categories.name}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                {bid.status === 'pending' && (
+                                  <Badge variant="outline" className="shrink-0">
+                                    Waiting for response
+                                  </Badge>
+                                )}
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>

@@ -3,12 +3,13 @@ import { useSearchParams } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, MapPin } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProviderCard from "@/components/providers/ProviderCard";
+import { ProviderFilters as ProviderFiltersType, ProviderFilters as ProviderFiltersComponent } from "@/components/providers/ProviderFilters";
 
 export default function Providers() {
   const [searchParams] = useSearchParams();
@@ -16,15 +17,16 @@ export default function Providers() {
   
   const [providers, setProviders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [availableOnly, setAvailableOnly] = useState(false);
+  const [filters, setFilters] = useState<ProviderFiltersType>({
+    query: skillParam || '',
+    sortBy: 'rating'
+  });
   const [categories, setCategories] = useState<any[]>([]);
 
   useEffect(() => {
     fetchCategories();
     fetchProviders();
-  }, [selectedCategory, availableOnly, skillParam]);
+  }, [filters]);
 
   const fetchCategories = async () => {
     const { data } = await supabase
@@ -64,7 +66,8 @@ export default function Providers() {
       `)
       .in('id', providerIds);
 
-    if (availableOnly) {
+    // Apply filters
+    if (filters.availableOnly) {
       query = query.eq('provider_settings.available_now', true);
     }
 
@@ -73,12 +76,23 @@ export default function Providers() {
     if (data) {
       let filteredData = data;
       
-      // Filter by skill if skill parameter is provided
-      if (skillParam) {
-        filteredData = data.filter(provider => 
+      // Filter by search query (name, bio, skills)
+      if (filters.query && filters.query.trim()) {
+        const searchTerm = filters.query.toLowerCase();
+        filteredData = filteredData.filter(provider => 
+          provider.full_name?.toLowerCase().includes(searchTerm) ||
+          provider.bio?.toLowerCase().includes(searchTerm) ||
+          provider.provider_settings?.bio_headline?.toLowerCase().includes(searchTerm) ||
           provider.provider_skills?.some((skill: any) => 
-            skill.skill_name.toLowerCase().includes(skillParam.toLowerCase())
+            skill.skill_name.toLowerCase().includes(searchTerm)
           )
+        );
+      }
+      
+      // Filter by location
+      if (filters.location) {
+        filteredData = filteredData.filter(provider =>
+          provider.location?.toLowerCase().includes(filters.location!.toLowerCase())
         );
       }
       
@@ -102,16 +116,63 @@ export default function Providers() {
         })
       );
 
-      setProviders(providersWithRatings);
+      // Apply additional filters
+      let finalData = providersWithRatings;
+
+      // Filter by minimum rating
+      if (filters.minRating) {
+        finalData = finalData.filter(p => p.avgRating >= filters.minRating!);
+      }
+
+      // Filter by hourly rate
+      if (filters.minHourlyRate || filters.maxHourlyRate) {
+        finalData = finalData.filter(p => {
+          const rate = p.provider_settings?.hourly_rate;
+          if (!rate) return false;
+          if (filters.minHourlyRate && rate < filters.minHourlyRate) return false;
+          if (filters.maxHourlyRate && rate > filters.maxHourlyRate) return false;
+          return true;
+        });
+      }
+
+      // Filter by response time
+      if (filters.responseTime && filters.responseTime !== 'any') {
+        const maxResponseHours = parseInt(filters.responseTime);
+        finalData = finalData.filter(p => {
+          const responseTime = p.provider_settings?.response_time_hours;
+          return responseTime && responseTime <= maxResponseHours;
+        });
+      }
+
+      // Filter by verified
+      if (filters.verifiedOnly) {
+        finalData = finalData.filter(p => 
+          p.provider_skills?.some((skill: any) => skill.verified)
+        );
+      }
+
+      // Sort providers
+      finalData.sort((a, b) => {
+        switch (filters.sortBy) {
+          case 'rating':
+            return b.avgRating - a.avgRating;
+          case 'reviews':
+            return b.reviewCount - a.reviewCount;
+          case 'price_low':
+            return (a.provider_settings?.hourly_rate || 0) - (b.provider_settings?.hourly_rate || 0);
+          case 'price_high':
+            return (b.provider_settings?.hourly_rate || 0) - (a.provider_settings?.hourly_rate || 0);
+          case 'recent':
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          default:
+            return 0;
+        }
+      });
+
+      setProviders(finalData);
     }
     setLoading(false);
   };
-
-  const filteredProviders = providers.filter(provider =>
-    provider.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    provider.bio?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    provider.provider_settings?.bio_headline?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -131,51 +192,43 @@ export default function Providers() {
               }
             </p>
             
-            {/* Search and Filters */}
-            <div className="max-w-4xl mx-auto space-y-4">
+            {/* Search */}
+            <div className="max-w-4xl mx-auto">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search by name, skills, or location..."
+                  placeholder="Search by name, skills, bio, or location..."
                   className="pl-10 h-12"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={filters.query || ''}
+                  onChange={(e) => setFilters({...filters, query: e.target.value})}
                 />
-              </div>
-              
-              <div className="flex flex-col md:flex-row gap-4">
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-full md:w-[200px]">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Button
-                  variant={availableOnly ? "default" : "outline"}
-                  onClick={() => setAvailableOnly(!availableOnly)}
-                  className="flex items-center gap-2"
-                >
-                  <Filter className="h-4 w-4" />
-                  Available Now
-                </Button>
+                {filters.query && (
+                  <button
+                    onClick={() => setFilters({...filters, query: ''})}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </section>
 
+        {/* Filters */}
+        <section className="py-6 px-4">
+          <div className="container mx-auto max-w-6xl">
+            <ProviderFiltersComponent filters={filters} onFiltersChange={setFilters} />
+          </div>
+        </section>
+
         {/* Providers Grid */}
-        <section className="py-16 px-4">
+        <section className="py-8 px-4">
           <div className="container mx-auto max-w-6xl">
             <div className="flex items-center justify-between mb-8">
               <p className="text-muted-foreground">
-                {filteredProviders.length} {filteredProviders.length === 1 ? 'provider' : 'providers'} found
+                {providers.length} {providers.length === 1 ? 'provider' : 'providers'} found
               </p>
             </div>
 
@@ -185,14 +238,14 @@ export default function Providers() {
                   <Skeleton key={i} className="h-80 w-full" />
                 ))}
               </div>
-            ) : filteredProviders.length === 0 ? (
+            ) : providers.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground text-lg mb-4">No providers found</p>
-                <p className="text-sm text-muted-foreground">Try adjusting your filters</p>
+                <p className="text-sm text-muted-foreground">Try adjusting your search or filters</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProviders.map((provider) => (
+                {providers.map((provider) => (
                   <ProviderCard key={provider.id} provider={provider} />
                 ))}
               </div>

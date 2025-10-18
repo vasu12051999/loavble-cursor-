@@ -6,8 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address').max(255),
@@ -19,6 +22,10 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const { signIn, signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
 
@@ -75,6 +82,40 @@ export default function Login() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!resetEmail) {
+      toast({ 
+        title: 'Email required', 
+        description: 'Please enter your email address',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+
+      if (error) throw error;
+
+      setResetSent(true);
+      toast({ 
+        title: 'Reset email sent!', 
+        description: 'Check your email for a password reset link'
+      });
+    } catch (error: any) {
+      toast({ 
+        title: 'Error', 
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/5 to-background p-4">
       <div className="w-full max-w-md">
@@ -125,7 +166,76 @@ export default function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        type="button" 
+                        variant="link" 
+                        className="px-0 text-xs h-auto"
+                        onClick={() => {
+                          setResetEmail(email);
+                          setResetSent(false);
+                        }}
+                      >
+                        Forgot password?
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Reset Password</DialogTitle>
+                        <DialogDescription>
+                          {resetSent 
+                            ? 'Check your email for a password reset link.'
+                            : 'Enter your email address and we\'ll send you a link to reset your password.'}
+                        </DialogDescription>
+                      </DialogHeader>
+                      {!resetSent ? (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="reset-email">Email</Label>
+                            <Input
+                              id="reset-email"
+                              type="email"
+                              placeholder="your@email.com"
+                              value={resetEmail}
+                              onChange={(e) => setResetEmail(e.target.value)}
+                              disabled={resetLoading}
+                            />
+                          </div>
+                          <DialogFooter>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              onClick={() => setForgotPasswordOpen(false)}
+                              disabled={resetLoading}
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              type="button" 
+                              onClick={handleForgotPassword}
+                              disabled={resetLoading}
+                            >
+                              {resetLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              Send Reset Link
+                            </Button>
+                          </DialogFooter>
+                        </>
+                      ) : (
+                        <DialogFooter>
+                          <Button 
+                            type="button" 
+                            onClick={() => setForgotPasswordOpen(false)}
+                          >
+                            Close
+                          </Button>
+                        </DialogFooter>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <Input
                   id="password"
                   type="password"

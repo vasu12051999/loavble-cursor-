@@ -7,11 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Briefcase, DollarSign, AlertTriangle, Settings, FileText, Eye } from 'lucide-react';
+import { Users, Briefcase, DollarSign, AlertTriangle, Settings, FileText, Eye, BarChart3 } from 'lucide-react';
 import { FinancialReports } from '@/components/admin/FinancialReports';
 import { DisputeResolution } from '@/components/admin/DisputeResolution';
 import { UserManagement } from '@/components/admin/UserManagement';
 import { PlatformSettings } from '@/components/admin/PlatformSettings';
+import { AnalyticsDashboard } from '@/components/admin/AnalyticsDashboard';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 
@@ -148,8 +149,12 @@ export default function Admin() {
           </Card>
         </div>
 
-        <Tabs defaultValue="users" className="space-y-4">
-          <TabsList>
+        <Tabs defaultValue="analytics" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="analytics">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="users">
               <Users className="h-4 w-4 mr-2" />
               Users
@@ -171,6 +176,10 @@ export default function Admin() {
               Settings
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="analytics">
+            <AnalyticsDashboard />
+          </TabsContent>
 
           <TabsContent value="users">
             <UserManagement />
