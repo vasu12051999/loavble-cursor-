@@ -8,7 +8,7 @@ import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, MapPin, Briefcase, MessageSquare, Calendar, Award, CheckCircle, DollarSign, Clock } from 'lucide-react';
 import { QuickQuoteDialog } from '@/components/providers/QuickQuoteDialog';
@@ -126,9 +126,13 @@ export default function Profile() {
         <div className="container py-12">
           <div className="flex items-start gap-6">
             <Avatar className="h-32 w-32">
-              <AvatarFallback className="text-3xl">
-                {profile.full_name?.[0] || 'U'}
-              </AvatarFallback>
+              {profile.avatar_url ? (
+                <AvatarImage src={profile.avatar_url} alt={profile.full_name || 'Avatar'} />
+              ) : (
+                <AvatarFallback className="text-3xl">
+                  {profile.full_name?.[0] || 'U'}
+                </AvatarFallback>
+              )}
             </Avatar>
             
             <div className="flex-1 space-y-4">

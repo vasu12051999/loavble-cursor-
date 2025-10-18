@@ -212,10 +212,13 @@ export default function Dashboard() {
               <CardContent className="pt-6">
                 <div className="flex flex-col md:flex-row items-start gap-6">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={profile.avatar_url} alt={profile.full_name || "User"} />
-                    <AvatarFallback>
-                      <User className="h-12 w-12" />
-                    </AvatarFallback>
+                    {profile.avatar_url ? (
+                      <AvatarImage src={profile.avatar_url} alt={profile.full_name || "User"} />
+                    ) : (
+                      <AvatarFallback>
+                        <User className="h-12 w-12" />
+                      </AvatarFallback>
+                    )}
                   </Avatar>
                   <div className="flex-1 w-full">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

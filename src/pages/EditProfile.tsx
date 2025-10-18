@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,10 +12,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Upload, Save } from 'lucide-react';
+import { useFileUpload } from '@/hooks/useFileUpload';
+import { Upload, Save, Loader2, X } from 'lucide-react';
 
 const profileSchema = z.object({
   full_name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -32,6 +33,17 @@ export default function EditProfile() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const { uploadFile, uploading, deleteFile } = useFileUpload({
+    bucket: 'avatars',
+    maxSizeMB: 5,
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
+    onSuccess: (url) => {
+      setAvatarUrl(url);
+    },
+  });
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -59,6 +71,7 @@ export default function EditProfile() {
 
     if (data) {
       setProfile(data);
+      setAvatarUrl(data.avatar_url);
       form.reset({
         full_name: data.full_name || '',
         bio: data.bio || '',
@@ -69,14 +82,41 @@ export default function EditProfile() {
     }
   };
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    // Upload the file
+    await uploadFile(file, user.id);
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!avatarUrl || !user) return;
+
+    // Delete old avatar from storage
+    await deleteFile(avatarUrl);
+    
+    // Update profile to remove avatar_url
+    await supabase
+      .from('profiles')
+      .update({ avatar_url: null })
+      .eq('id', user.id);
+    
+    setAvatarUrl(null);
+  };
+
   const onSubmit = async (data: ProfileFormData) => {
     if (!user) return;
 
     setLoading(true);
     try {
+      // Update profile with avatar URL
       const { error } = await supabase
         .from('profiles')
-        .update(data)
+        .update({
+          ...data,
+          avatar_url: avatarUrl,
+        })
         .eq('id', user.id);
 
       if (error) throw error;
@@ -108,22 +148,61 @@ export default function EditProfile() {
         <Card>
           <CardHeader>
             <CardTitle>Profile Photo</CardTitle>
-            <CardDescription>Upload a profile picture</CardDescription>
+            <CardDescription>Upload a profile picture (Max 5MB)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-6">
-              <Avatar className="h-24 w-24">
-                <AvatarFallback className="text-2xl">
-                  {profile?.full_name?.[0] || 'U'}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="h-24 w-24">
+                  {avatarUrl ? (
+                    <AvatarImage src={avatarUrl} alt={profile?.full_name || 'Avatar'} />
+                  ) : (
+                    <AvatarFallback className="text-2xl">
+                      {profile?.full_name?.[0] || 'U'}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                {avatarUrl && !uploading && (
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 h-8 w-8 rounded-full"
+                    onClick={handleRemoveAvatar}
+                    type="button"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
               <div className="space-y-2">
-                <Button variant="outline">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Photo
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  disabled={uploading}
+                />
+                <Button 
+                  variant="outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  type="button"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Photo
+                    </>
+                  )}
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  JPG, PNG or GIF. Max size 2MB
+                  JPG, PNG, GIF or WebP. Max size 5MB
                 </p>
               </div>
             </div>

@@ -175,6 +175,30 @@ export default function JobDetail() {
                 <p className="text-muted-foreground">{job.description}</p>
               </div>
 
+              {/* Job Photos */}
+              {job.media_urls && job.media_urls.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Photos</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {job.media_urls.map((url: string, index: number) => (
+                      <a
+                        key={index}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block aspect-square overflow-hidden rounded-lg border hover:opacity-80 transition-opacity"
+                      >
+                        <img
+                          src={url}
+                          alt={`Job photo ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {job.description_spanish && (
                 <Button variant="outline" size="sm">
                   <Languages className="mr-2 h-4 w-4" />
