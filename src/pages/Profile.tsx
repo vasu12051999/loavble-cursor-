@@ -42,87 +42,130 @@ export default function Profile() {
       return;
     }
 
-    const isOwnProfile = uid === user?.id;
-    
-    // Fetch profile data
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', uid)
-      .maybeSingle();
+    try {
+      const isOwnProfile = uid === user?.id;
+      
+      // Fetch profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', uid)
+        .maybeSingle();
 
-    if (profileData) {
-      // Fetch user roles separately
-      const { data: rolesData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', uid);
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+      }
 
-      // Combine the data
-      setProfile({
-        ...profileData,
-        user_roles: rolesData || []
-      });
+      if (profileData) {
+        // Fetch user roles separately
+        const { data: rolesData, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', uid);
+
+        if (rolesError) {
+          console.error('Error fetching roles:', rolesError);
+        }
+
+        // Combine the data
+        setProfile({
+          ...profileData,
+          user_roles: rolesData || []
+        });
+      }
+    } catch (error) {
+      console.error('Unexpected error in fetchProfile:', error);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const fetchProviderData = async () => {
     if (!uid) return;
 
-    const { data: settings } = await supabase
-      .from('provider_settings')
-      .select('*')
-      .eq('provider_id', uid)
-      .maybeSingle();
+    try {
+      const { data: settings } = await supabase
+        .from('provider_settings')
+        .select('*')
+        .eq('provider_id', uid)
+        .maybeSingle();
 
-    const { data: skillsData } = await supabase
-      .from('provider_skills')
-      .select('*')
-      .eq('provider_id', uid);
+      const { data: skillsData } = await supabase
+        .from('provider_skills')
+        .select('*')
+        .eq('provider_id', uid);
 
-    const { data: certsData } = await supabase
-      .from('provider_certifications')
-      .select('*')
-      .eq('provider_id', uid);
+      const { data: certsData } = await supabase
+        .from('provider_certifications')
+        .select('*')
+        .eq('provider_id', uid);
 
-    setProviderSettings(settings);
-    setSkills(skillsData || []);
-    setCertifications(certsData || []);
+      setProviderSettings(settings);
+      setSkills(skillsData || []);
+      setCertifications(certsData || []);
+    } catch (error) {
+      console.error('Error fetching provider data:', error);
+    }
   };
 
   const fetchCompletedJobs = async () => {
-    const { data } = await supabase
-      .from('jobs')
-      .select('*, categories(name)')
-      .eq('awarded_provider_id', uid)
-      .eq('status', 'completed')
-      .limit(6);
+    if (!uid) return;
+    
+    try {
+      const { data } = await supabase
+        .from('jobs')
+        .select('*, categories(name)')
+        .eq('awarded_provider_id', uid)
+        .eq('status', 'completed')
+        .limit(6);
 
-    setCompletedJobs(data || []);
+      setCompletedJobs(data || []);
+    } catch (error) {
+      console.error('Error fetching completed jobs:', error);
+    }
   };
 
   const fetchReviews = async () => {
-    // Fetch reviews with average rating
-    const { data } = await supabase
-      .from('reviews')
-      .select('rating')
-      .eq('reviewed_id', uid);
+    if (!uid) return;
+    
+    try {
+      // Fetch reviews with average rating
+      const { data } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('reviewed_id', uid);
 
-    if (data && data.length > 0) {
-      const avgRating = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
-      setReviews(data);
-      setReviewStats({ averageRating: avgRating, totalReviews: data.length });
+      if (data && data.length > 0) {
+        const avgRating = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
+        setReviews(data);
+        setReviewStats({ averageRating: avgRating, totalReviews: data.length });
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
     }
   };
 
   if (loading) {
-    return <div className="container py-8">{t('profile.loadingProfile')}</div>;
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="container py-8">Loading profile...</div>
+        <Footer />
+      </div>
+    );
   }
 
   if (!profile) {
-    return <div className="container py-8">{t('profile.notFound')}</div>;
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="container py-8">
+          <h1 className="text-2xl font-bold mb-4">Profile Not Found</h1>
+          <p className="text-muted-foreground">The profile you're looking for doesn't exist.</p>
+        </div>
+        <Footer />
+      </div>
+    );
   }
 
   const isProvider = profile.user_roles?.some((r: any) => r.role === 'provider');
