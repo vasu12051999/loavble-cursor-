@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, MapPin, Briefcase, MessageSquare, Calendar, Award, CheckCircle, DollarSign, Clock } from 'lucide-react';
 import { QuickQuoteDialog } from '@/components/providers/QuickQuoteDialog';
+import { PortfolioGallery } from '@/components/portfolio/PortfolioGallery';
 import { toast } from '@/hooks/use-toast';
 
 export default function Profile() {
@@ -246,30 +247,11 @@ export default function Profile() {
           <TabsContent value="portfolio" className="space-y-4">
             <h2 className="text-2xl font-bold">{t('profile.completedWork')}</h2>
             
-            {completedJobs.length === 0 ? (
-              <Card className="p-12 text-center">
-                <p className="text-muted-foreground">{t('profile.noCompletedJobs')}</p>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {completedJobs.map((job) => (
-                  <Card key={job.id} className="overflow-hidden">
-                    <div className="aspect-video bg-muted flex items-center justify-center">
-                      <Briefcase className="h-12 w-12 text-muted-foreground" />
-                    </div>
-                    <CardContent className="pt-4">
-                      <Badge variant="secondary" className="mb-2">
-                        {job.categories?.name}
-                      </Badge>
-                      <h3 className="font-semibold line-clamp-2">{job.title}</h3>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {job.description}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            {/* Portfolio Gallery */}
+            <PortfolioGallery 
+              providerId={uid!} 
+              isOwnProfile={user?.id === uid}
+            />
           </TabsContent>
 
           <TabsContent value="reviews" className="space-y-4">
