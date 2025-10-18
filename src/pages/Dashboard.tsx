@@ -24,6 +24,7 @@ export default function Dashboard() {
     activeBids: 0,
     totalEarned: 0,
     rating: 0,
+    completedJobs: 0,
     totalUsers: 0,
     totalJobsAdmin: 0,
     platformFees: 0,
@@ -142,22 +143,25 @@ export default function Dashboard() {
       }));
     } else if (userRole === 'provider') {
       // Fetch provider stats
-      const [bidsData, paymentsData, reviewsData] = await Promise.all([
+      const [bidsData, paymentsData, reviewsData, completedJobsData] = await Promise.all([
         supabase.from('bids').select('id', { count: 'exact', head: true }).eq('provider_id', user?.id).eq('status', 'pending'),
         supabase.from('payments').select('provider_fee').eq('provider_id', user?.id).eq('status', 'completed'),
-        supabase.from('reviews').select('rating').eq('reviewed_id', user?.id)
+        supabase.from('reviews').select('rating').eq('reviewed_id', user?.id),
+        supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('awarded_provider_id', user?.id).eq('status', 'completed')
       ]);
 
       const totalEarned = paymentsData.data?.reduce((sum, p) => sum + Number(p.provider_fee), 0) || 0;
       const avgRating = reviewsData.data && reviewsData.data.length > 0
         ? reviewsData.data.reduce((sum, r) => sum + r.rating, 0) / reviewsData.data.length
         : 0;
+      const completedJobs = completedJobsData.count || 0;
 
       setStats(prev => ({
         ...prev,
         activeBids: bidsData.count || 0,
         totalEarned,
-        rating: avgRating
+        rating: avgRating,
+        completedJobs
       }));
     } else if (userRole === 'admin') {
       // Fetch admin stats
@@ -449,7 +453,12 @@ export default function Dashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{stats.rating > 0 ? stats.rating.toFixed(1) : '—'}</div>
-                    <p className="text-xs text-muted-foreground">{t('dashboard.stats.noReviews')}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.completedJobs > 0 
+                        ? `From ${stats.completedJobs} completed ${stats.completedJobs === 1 ? 'job' : 'jobs'}`
+                        : t('dashboard.stats.noReviews')
+                      }
+                    </p>
                   </CardContent>
                 </Card>
               </div>

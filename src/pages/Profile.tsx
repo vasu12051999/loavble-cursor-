@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, MapPin, Briefcase, MessageSquare, Calendar, Award, CheckCircle, DollarSign, Clock } from 'lucide-react';
 import { QuickQuoteDialog } from '@/components/providers/QuickQuoteDialog';
 import { PortfolioGallery } from '@/components/portfolio/PortfolioGallery';
+import { ReviewsList } from '@/components/reviews/ReviewsList';
 import { toast } from '@/hooks/use-toast';
 
 export default function Profile() {
@@ -26,6 +27,7 @@ export default function Profile() {
   const [completedJobs, setCompletedJobs] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewStats, setReviewStats] = useState({ averageRating: 0, totalReviews: 0 });
 
   useEffect(() => {
     fetchProfile();
@@ -102,8 +104,17 @@ export default function Profile() {
   };
 
   const fetchReviews = async () => {
-    // Placeholder for reviews - would need a reviews table
-    setReviews([]);
+    // Fetch reviews with average rating
+    const { data } = await supabase
+      .from('reviews')
+      .select('rating')
+      .eq('reviewed_id', uid);
+
+    if (data && data.length > 0) {
+      const avgRating = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
+      setReviews(data);
+      setReviewStats({ averageRating: avgRating, totalReviews: data.length });
+    }
   };
 
   if (loading) {
@@ -115,8 +126,9 @@ export default function Profile() {
   }
 
   const isProvider = profile.user_roles?.some((r: any) => r.role === 'provider');
-  const averageRating = 4.8; // Placeholder
-  const totalReviews = 24; // Placeholder
+  
+  // Use review stats from state
+  const { averageRating, totalReviews } = reviewStats;
   const completedJobsCount = completedJobs.length;
 
   return (
@@ -139,11 +151,15 @@ export default function Profile() {
               <div>
                 <h1 className="text-3xl font-bold">{profile.full_name || 'Anonymous'}</h1>
                 <div className="flex items-center gap-4 mt-2 text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold">{averageRating}</span>
-                    <span>({totalReviews} reviews)</span>
-                  </div>
+                  {totalReviews > 0 ? (
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-semibold">{averageRating.toFixed(1)}</span>
+                      <span>({totalReviews} {totalReviews === 1 ? 'review' : 'reviews'})</span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">No reviews yet</span>
+                  )}
                   {profile.location && (
                     <div className="flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
@@ -221,7 +237,9 @@ export default function Profile() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{t('profile.rating')}</span>
-                    <span className="text-2xl font-bold">{averageRating}</span>
+                    <span className="text-2xl font-bold">
+                      {averageRating > 0 ? averageRating.toFixed(1) : '—'}
+                    </span>
                   </div>
                   {providerSettings?.available_now ? (
                     <Badge variant="default" className="w-full justify-center bg-green-600">
@@ -260,10 +278,7 @@ export default function Profile() {
 
           <TabsContent value="reviews" className="space-y-4">
             <h2 className="text-2xl font-bold">{t('profile.reviewsRatings')}</h2>
-            
-            <Card className="p-12 text-center">
-              <p className="text-muted-foreground">{t('profile.noReviews')}</p>
-            </Card>
+            <ReviewsList userId={uid!} limit={10} />
           </TabsContent>
 
           {isProvider && (

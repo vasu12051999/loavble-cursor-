@@ -11,6 +11,7 @@ import { MapPin, DollarSign, Calendar, MessageSquare, Award, Languages, Flag } f
 import { toast } from '@/hooks/use-toast';
 import BidCard from '@/components/jobs/BidCard';
 import { JobStatusActions } from '@/components/jobs/JobStatusActions';
+import { JobReviewPrompt } from '@/components/jobs/JobReviewPrompt';
 import { useRealtimeBids } from '@/hooks/useRealtimeBids';
 import { ReportDialog } from '@/components/jobs/ReportDialog';
 import { analytics } from '@/utils/analytics';
@@ -139,6 +140,11 @@ export default function JobDetail() {
     <div className="container py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {/* Review Prompt for Completed Jobs */}
+          {job.status === 'completed' && (
+            <JobReviewPrompt jobId={id!} jobTitle={job.title} />
+          )}
+          
           <Card>
             <CardHeader>
               <div className="flex items-start justify-between">
